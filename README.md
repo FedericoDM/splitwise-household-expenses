@@ -1,2 +1,2 @@
-# splitwise-household-expenses
+# household-expenses
 Household Expenses Automation via Splitwise
