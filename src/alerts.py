@@ -14,7 +14,37 @@ from keys import email_keys
 from splitwise import Splitwise
 
 # Global variables
-recipients = ["yourmail@gmail.com", "othermail@gmail.com"]
+recipients = ["yourmail@domain.com", "othermail@domain.com"]
+
+
+def get_expenses_and_budget(splitwise, category):
+    """
+    Gets expenses and budget
+    """
+
+    budget_dict = {
+        "Dining out": splitwise.FOOD_BUDGET,
+        "Groceries": splitwise.GROCERIES_BUDGET,
+        "Taxi": splitwise.TRANSPORTATION_BUDGET,
+    }
+
+    existing_categories = splitwise.remaining_budget.loc[:, "category"].values
+
+    if category in existing_categories:
+        expense = splitwise.remaining_budget.loc[
+            splitwise.remaining_budget.loc[:, "category"] == category, "cost"
+        ].values[0]
+
+        remaining_budget = splitwise.remaining_budget.loc[
+            splitwise.remaining_budget.loc[:, "category"] == category,
+            "remaining_budget",
+        ].values[0]
+
+    else:
+        expense = 0
+        remaining_budget = budget_dict[category]
+
+    return expense, remaining_budget
 
 
 def send_email_html(recipient, alert_subject, html):
@@ -27,7 +57,7 @@ def send_email_html(recipient, alert_subject, html):
     api_key = email_keys["api_key"]
     sg = sendgrid.SendGridAPIClient(api_key)
 
-    from_email = "somemail@outlook.com"
+    from_email = "yourmail@domain.com"
     to_email = recipient
     subject = alert_subject
 
@@ -48,36 +78,51 @@ def alert_handler(event, context):
     # Get expenses
     splitwise = Splitwise()
     expenses = splitwise.get_expenses()
-    print(expenses)
     print(splitwise.remaining_budget)
     print(splitwise.total_expenses)
 
+    REMAINING_BUDGET = round(splitwise.OVERALL_BUDGET - splitwise.total_expenses, 2)
+
+    DINING_OUT_EXPENSES, REMAINING_DINING_OUT_BUDGET = get_expenses_and_budget(
+        splitwise, "Dining out"
+    )
+
+    GROCERIES_EXPENSES, REMAINING_GROCERIES_BUDGET = get_expenses_and_budget(
+        splitwise, "Groceries"
+    )
+
+    TRANSPORTATION_EXPENSES, REMAINING_TRANSPORTATION_BUDGET = get_expenses_and_budget(
+        splitwise, "Taxi"
+    )
+
     # Send email
-    subject = f"Household Expenses - {today}"
+    subject = f"Gastos Household - {today}"
 
     html = f"""
-    <p>Hello,</p>
-    <p>This is the expense summary for {today}:</p>
+    <p>Hola,</p>
+    <p>Este es el resumen semanal de los gastos del household al día de hoy, {today}:</p>
+    
+    
+    <p><b>Gastos Totales</b></p>
+    <p>Hemos gastado un total de ${splitwise.total_expenses} USD. </p> 
+    <p>El presupuesto total es de {splitwise.OVERALL_BUDGET} USD, por lo que nos quedan {REMAINING_BUDGET} USD.</p>
 
-    <p><b>Total Expenses</b></p>
-    <p>We have spent a total of ${splitwise.total_expenses} USD.</p>
-    <p>The total budget is {splitwise.OVERALL_BUDGET} USD, so there are around {round(splitwise.OVERALL_BUDGET - splitwise.total_expenses, 2)} USD left.</p>
+    <p><b>Gastos en Comida (Salidas)</b></p>
+    <p>Hemos gastado un total de ${DINING_OUT_EXPENSES} USD. </p>
+    <p>El presupuesto de comida es de {splitwise.FOOD_BUDGET} USD, por lo que nos quedan {REMAINING_DINING_OUT_BUDGET} USD.</p>
 
-    <p><b>Food Expenses</b></p>
-    <p>We have spent a total of ${splitwise.remaining_budget.loc[splitwise.remaining_budget.loc[:, "category"] == "Dining out", "cost"].values[0]} USD. </p>
-    <p>The food budget is {splitwise.FOOD_BUDGET} USD, so we have {splitwise.remaining_budget.loc[splitwise.remaining_budget.loc[:, "category"] == "Dining out", "remaining_budget"].values[0]} USD left.</p>
+    <p><b>Gastos en Groceries</b></p>
+    <p>Hemos gastado un total de ${GROCERIES_EXPENSES} USD. </p>
+    <p>El presupuesto de groceries es de {splitwise.GROCERIES_BUDGET} USD, por lo que nos quedan {REMAINING_GROCERIES_BUDGET} USD.</p>
 
-    <p><b>Groceries Expenses</b></p>
-    <p>We have spent a total of ${splitwise.remaining_budget.loc[splitwise.remaining_budget.loc[:, "category"] == "Groceries", "cost"].values[0]} USD. </p>
-    <p>The groceries budget is {splitwise.GROCERIES_BUDGET} USD, so we have {splitwise.remaining_budget.loc[splitwise.remaining_budget.loc[:, "category"] == "Groceries", "remaining_budget"].values[0]} USD left.</p>
+    <p><b>Gastos en Transporte</b></p>
+    <p>Hemos gastado un total de ${TRANSPORTATION_EXPENSES} USD. </p>
+    <p>El presupuesto de transporte es de {splitwise.TRANSPORTATION_BUDGET} USD, por lo que nos quedan {REMAINING_TRANSPORTATION_BUDGET} USD.</p>
 
-    <p><b>Transportation Expenses</b></p>
-    <p>We have spent a total of ${splitwise.remaining_budget.loc[splitwise.remaining_budget.loc[:, "category"] == "Taxi", "cost"].values[0]} USD. </p>
-    <p>The transportation budget is {splitwise.TRANSPORTATION_BUDGET} USD, so we have {splitwise.remaining_budget.loc[splitwise.remaining_budget.loc[:, "category"] == "Taxi", "remaining_budget"].values[0]} USD left.</p>
-
-    <p>Have a great day!</p>
-    """  # noqa: E501
+    <p>Que tengas un buen día!</p>
+    <p>Saludos.</p> """  # noqa: E501
 
     # Send email
     for recipient in recipients:
         send_email_html(recipient, subject, html)
+
