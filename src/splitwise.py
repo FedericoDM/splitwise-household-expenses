@@ -16,6 +16,7 @@ class Splitwise:
     OVERALL_BUDGET = 1110
     DESIRED_USER = "Lluvia"
     UNDESIRED_GROUPS = [50435769, 38405778]
+    UNDESIRED_EXPENSES = ["Medicamento"]
     NUM_DECIMALS = 2
 
     def __init__(self):
@@ -35,9 +36,7 @@ class Splitwise:
         Returns first day of the month
         """
         today = datetime.now(pytz.timezone("US/Central"))
-        first_day = datetime(today.year, today.month, 1)
-
-        self.first_day = first_day.strftime("%Y-%m-%d")
+        self.todays_month = today.month
 
     def filter_month_expenses(self, expenses_df):
         """
@@ -45,9 +44,11 @@ class Splitwise:
         """
         self.get_month_first_day()
         expenses_df["date"] = pd.to_datetime(expenses_df["date"])
-        expenses_df = expenses_df.loc[
-            expenses_df.loc[:, "date"] >= self.first_day, :
-        ].copy()
+        # Get month column
+        expenses_df["month"] = expenses_df["date"].dt.month
+        expenses_df = expenses_df.loc[expenses_df["month"] == self.todays_month].copy()
+        expenses_df.reset_index(inplace=True, drop=True)
+        expenses_df.drop(columns=["month"], inplace=True)
 
         return expenses_df
 
@@ -113,6 +114,10 @@ class Splitwise:
                 continue
 
             if self.DESIRED_USER not in user_names:
+                print("Skipping expense: ", expense_dict["description"])
+                continue
+
+            if expense_dict["description"] in self.UNDESIRED_EXPENSES:
                 print("Skipping expense: ", expense_dict["description"])
                 continue
 
