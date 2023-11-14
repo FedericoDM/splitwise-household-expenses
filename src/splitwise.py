@@ -30,13 +30,13 @@ class Splitwise:
         self.headers = {"Authorization": "Bearer " + self.KEY}
 
         # Get first day of the month
-
     def get_month_first_day(self):
         """
         Returns first day of the month
         """
         today = datetime.now(pytz.timezone("US/Central"))
         self.todays_month = today.month
+        self.todays_year = today.year
 
     def filter_month_expenses(self, expenses_df):
         """
@@ -46,9 +46,13 @@ class Splitwise:
         expenses_df["date"] = pd.to_datetime(expenses_df["date"])
         # Get month column
         expenses_df["month"] = expenses_df["date"].dt.month
-        expenses_df = expenses_df.loc[expenses_df["month"] == self.todays_month].copy()
+        expenses_df["year"] = expenses_df["date"].dt.year
+        expenses_df = expenses_df.loc[
+            (expenses_df["month"] == self.todays_month)
+            & (expenses_df["year"] == self.todays_year)
+        ].copy()
         expenses_df.reset_index(inplace=True, drop=True)
-        expenses_df.drop(columns=["month"], inplace=True)
+        expenses_df.drop(columns=["month", "year"], inplace=True)
 
         return expenses_df
 
